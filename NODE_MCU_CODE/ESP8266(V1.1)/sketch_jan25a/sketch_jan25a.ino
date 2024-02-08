@@ -342,6 +342,26 @@ bool checkSwitchState() {
 }
 
 
+void waitForAck() {
+  String ack;
+  while (ack != "ACK") {
+    if (Serial.available()) {
+      char c = Serial.read();
+      if (c == '\n') {
+        //ack.trim(); // Remove leading/trailing whitespace
+        if (ack == "ACK") {
+          Serial.println("ACK received");
+          break; // Exit loop if "ACK" received
+        } else {
+          Serial.println("Invalid acknowledgment: " + ack);
+          ack = ""; // Reset acknowledgment string
+        }
+      } else {
+        ack += c; // Append character to acknowledgment string
+      }
+    }
+  }
+}
 
 
 
@@ -431,7 +451,7 @@ void loop() {
     file.close();
     if(doneFound)
     {
-        Serial.println("Last line contains 'Done'");
+        //Serial.println("Last line contains 'Done'");
         Serial.begin(115200);
         delay(50);
         //wait for other oend to send "START"
@@ -450,10 +470,6 @@ void loop() {
         }
         else
         {
-          // Receiver signaled to start transmission
-          Serial.println("Receiver signaled to start transmission");
-          readFile("/" + fileName);
-          //Re-open the file for reading 
           file = LittleFS.open("/" + fileName, "r");
           
           if(!file)
@@ -461,49 +477,75 @@ void loop() {
             Serial.println("Failed to open the file for reading");
             return;
           }
-          // Read the file line by line and send each line
-          while (file.available()) 
+          //delay(1000);
+          while(1)
           {
+              while (file.available()) 
+              {
+                char c = file.read(); // Read a character from the file
+                Serial.write(c); // Send the character through UART
+                while(!Serial.available()){
+                  //Serial.println("Waiting For ACK");
+                }
+                // Read acknowledgment from receiver
+                 String ack = Serial.readStringUntil('\n');
+                  if (ack != "ACK")
+                  {
+                      break;                
+                }
+                delay(5); // Optional delay for stability
+                }
+                break;
+                //wait for acknowledgment from the receiver
+                
+            }
+          }
+          
+          // Receiver signaled to start transmission
+          //Serial.println("Receiver signaled to start transmission");
+          //readFile("/" + fileName);
+          //Re-open the file for reading 
+          
+          
+          
+            
+          /*
+          // Read the file line by line and send each line
+          while (1) 
+          {
+              //Serial.println("HEY");
               String line = file.readStringUntil('\n');
-              Serial.println(line);
+              // Convert the String to a character array (c_str())
+              const char* charArray = line.c_str();
+  
+              // Send data through USART
+              for (int i = 0; i < line.length(); i++)
+              {
+                Serial.write(charArray[i]);
+              }
+              Serial.write('\n');
+              //Serial.println(line);
               //wait for acknowledgment from the receiver
               while(!Serial.available())
               {
                 //wait
-                delay(100);
+                delay(50);
               }
 
               // Read acknowledgment from receiver
               String ack = Serial.readStringUntil('\n');
-              if (ack != "ACK")
+              if (ack == "ACK")
               {
+                //Serial.println("ACK received");
                 // Error: No ACK received
-                Serial.println("Error: No ACK received");
-                resendLine = true;
+                //Serial.println("Error: No ACK received");
+                //resendLine = true;
               }
               else
               {
                   // Acknowledgment received, reset flag
-                  resendLine = false;
-              }
-              while(resendLine)
-              {
-                Serial.println(line);
-
-                //wait for acknowledgment from the receiver
-                while(!Serial.available())
-                {
-                  //wait
-                  delay(100);
-                }
-                // Read acknowledgment from receiver again
-                ack = Serial.readStringUntil('\n');
-                if (ack == "ACK")
-                {
-                  // Acknowledgment received, reset flag
-                  resendLine = false;
-                }
-                
+                  //resendLine = false;
+                  
               }
               
           }
@@ -511,9 +553,11 @@ void loop() {
 
           
         }
+        */
         file.close();
       
     }
+    
     else
     {
       doneFound = false;
